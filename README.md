@@ -2,6 +2,12 @@
 
 A production-ready personal finance management application with real UPI payment integration, built specifically for Indian users.
 
+## 📺 App Overview
+
+🎥 **[Watch App Demo & Overview on LinkedIn](https://www.linkedin.com/posts/sumit-singh-860594328_buildwithkiroathackxios2k25-hackxios2k25-activity-7411707141197193217-UF4Q?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAFMR6PMBpMBe3G0eI3xmbz5VI-idwhPi1U4)**
+
+See Spendly in action! This LinkedIn post showcases the complete app functionality, UPI payment integration, and user experience.
+
 ## 🚀 Features
 
 ### Core Functionality
