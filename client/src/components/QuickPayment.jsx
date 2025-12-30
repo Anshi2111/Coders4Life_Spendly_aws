@@ -459,72 +459,10 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
               
               <div className="space-y-3">
                 {/* Success Button */}
-                <div 
-                  onClick={() => {
-                    if (isProcessing) return;
-                    
-                    console.log('✅ PAYMENT SUCCESS CLICKED');
-                    setIsProcessing(true);
-                    
-                    // Simple direct approach
-                    const amount = parseFloat(formData.amount);
-                    const categoryId = formData.categoryId;
-                    
-                    // Create transaction via API
-                    fetch('/api/transactions', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                      },
-                      body: JSON.stringify({
-                        category_id: categoryId,
-                        amount: amount,
-                        merchant_upi: formData.upiId,
-                        merchant_name: formData.merchantName || 'Payment',
-                        note: `Payment via ${formData.upiId}`
-                      })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                      console.log('Transaction created:', data);
-                      
-                      if (data.transaction?.id) {
-                        // Update to success
-                        return fetch(`/api/transactions/${data.transaction.id}/status`, {
-                          method: 'PUT',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('token')}`
-                          },
-                          body: JSON.stringify({ status: 'success' })
-                        });
-                      } else {
-                        throw new Error('No transaction ID');
-                      }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                      console.log('Transaction updated:', data);
-                      showToast(`Payment of ₹${amount} completed!`);
-                      
-                      // Refresh data
-                      loadData();
-                      
-                      // Close modal
-                      setTimeout(() => {
-                        setShowConfirmation(false);
-                        setIsProcessing(false);
-                        onClose();
-                      }, 1500);
-                    })
-                    .catch(error => {
-                      console.error('Payment error:', error);
-                      showToast('Payment failed to record', 'error');
-                      setIsProcessing(false);
-                    });
-                  }}
-                  className={`w-full py-3 px-4 rounded-lg text-center cursor-pointer transition-all ${
+                <button
+                  onClick={() => handlePaymentConfirmation(true)}
+                  disabled={isProcessing}
+                  className={`w-full py-3 px-4 rounded-lg text-center transition-all ${
                     isProcessing 
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600'
@@ -544,19 +482,13 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
                   ) : (
                     '✅ Yes, Payment Successful'
                   )}
-                </div>
+                </button>
                 
                 {/* Failed Button */}
-                <div 
-                  onClick={() => {
-                    if (isProcessing) return;
-                    console.log('❌ PAYMENT FAILED CLICKED');
-                    showToast('Payment cancelled', 'info');
-                    sessionStorage.removeItem('pendingPayment');
-                    setShowConfirmation(false);
-                    onClose();
-                  }}
-                  className="w-full py-3 px-4 rounded-lg border-2 border-gray-300 text-center cursor-pointer hover:bg-gray-50 transition-all"
+                <button
+                  onClick={() => handlePaymentConfirmation(false)}
+                  disabled={isProcessing}
+                  className="w-full py-3 px-4 rounded-lg border-2 border-gray-300 text-center hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     color: '#374151',
                     fontWeight: '500',
@@ -564,20 +496,21 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
                   }}
                 >
                   ❌ No, Payment Failed
-                </div>
+                </button>
                 
                 {/* Cancel Button */}
-                <div 
+                <button
                   onClick={() => {
                     if (isProcessing) return;
                     console.log('🔄 CANCEL CLICKED');
                     setShowConfirmation(false);
                   }}
-                  className="w-full py-2 text-center cursor-pointer text-gray-500 hover:text-gray-700 transition-colors"
+                  disabled={isProcessing}
+                  className="w-full py-2 text-center text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ fontSize: '14px' }}
                 >
                   Cancel & Try Again
-                </div>
+                </button>
               </div>
             </div>
           )}
