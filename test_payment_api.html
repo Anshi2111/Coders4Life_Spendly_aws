@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Payment API</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 10px; padding: 10px; border-radius: 4px; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Spendly Payment API Test</h1>
+    
+    <div class="test-section">
+        <h3>Step 1: Login</h3>
+        <input type="email" id="email" value="test@example.com" placeholder="Email">
+        <input type="password" id="password" value="TestPassword123!" placeholder="Password">
+        <button onclick="testLogin()">Login</button>
+        <div id="loginResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 2: Get Categories</h3>
+        <button onclick="getCategories()">Get Categories</button>
+        <div id="categoriesResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 3: Test Payment Flow</h3>
+        <input type="number" id="amount" value="50" placeholder="Amount">
+        <input type="text" id="upiId" value="merchant@paytm" placeholder="UPI ID">
+        <button onclick="testPaymentFlow()">Test Complete Payment</button>
+        <div id="paymentResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 4: Check Results</h3>
+        <button onclick="checkTransactions()">Check Transactions</button>
+        <button onclick="checkBalances()">Check Balances</button>
+        <div id="resultsCheck" class="result"></div>
+    </div>
+
+    <script>
+        let token = '';
+        let categoryId = '';
+
+        function showResult(elementId, message, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = `result ${isSuccess ? 'success' : 'error'}`;
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    token = data.token;
+                    showResult('loginResult', `✅ Login successful! User: ${data.user.name || email}`);
+                } else {
+                    showResult('loginResult', `❌ Login failed: ${data.message}`, false);
+                }
+            } catch (error) {
+                showResult('loginResult', `❌ Login error: ${error.message}`, false);
+            }
+        }
+
+        async function getCategories() {
+            if (!token) {
+                showResult('categoriesResult', '❌ Please login first', false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/categories', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.categories.length > 0) {
+                    categoryId = data.categories[0].id;
+                    const categoriesInfo = data.categories.map(cat => 
+                        `${cat.name}: ₹${cat.current_balance}`
+                    ).join('<br>');
+                    showResult('categoriesResult', `✅ Categories loaded:<br>${categoriesInfo}`);
+                } else {
+                    showResult('categoriesResult', '⚠️ No categories found. Creating test category...', false);
+                    await createTestCategory();
+                }
+            } catch (error) {
+                showResult('categoriesResult', `❌ Categories error: ${error.message}`, false);
+            }
+        }
+
+        async function createTestCategory() {
+            try {
+                // Create category
+                const categoryResponse = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({
+                        name: 'Test Food',
+                        percentage: 30,
+                        salary: 50000
+                    })
+                });
+
+                if (categoryResponse.ok) {
+                    // Update salary
+                    await fetch('/api/user/salary', {
+                        method: 'PUT',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({ salary: 50000 })
+                    });
+
+                    // Recalculate balances
+                    await fetch('/api/categories/recalculate', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    showResult('categoriesResult', '✅ Test category created and balances calculated');
+                    await getCategories();
+                }
+            } catch (error) {
+                showResult('categoriesResult', `❌ Failed to create test category: ${error.message}`, false);
+            }
+        }
+
+        async function testPaymentFlow() {
+            if (!token || !categoryId) {
+                showResult('paymentResult', '❌ Please login and get categories first', false);
+                return;
+            }
+
+            const amount = document.getElementById('amount').value;
+            const upiId = document.getElementById('upiId').value;
+
+            try {
+                showResult('paymentResult', '🔄 Creating transaction...');
+
+                // Step 1: Create transaction
+                const createResponse = await fetch('/api/transactions', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({
+                        category_id: categoryId,
+                        amount: parseFloat(amount),
+                        merchant_upi: upiId,
+                        merchant_name: 'Test Payment',
+                        note: 'API Test Payment'
+                    })
+                });
+
+                const createData = await createResponse.json();
+                
+                if (!createResponse.ok) {
+                    throw new Error(createData.message);
+                }
+
+                const transactionId = createData.transaction.id;
+                showResult('paymentResult', `🔄 Transaction created (ID: ${transactionId}). Updating status...`);
+
+                // Step 2: Update status to success
+                const statusResponse = await fetch(`/api/transactions/${transactionId}/status`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({ status: 'success' })
+                });
+
+                const statusData = await statusResponse.json();
+                
+                if (statusResponse.ok) {
+                    showResult('paymentResult', `✅ Payment completed successfully!<br>Amount: ₹${amount}<br>Transaction ID: ${createData.transaction.transaction_id}`);
+                } else {
+                    throw new Error(statusData.message);
+                }
+
+            } catch (error) {
+                showResult('paymentResult', `❌ Payment failed: ${error.message}`, false);
+            }
+        }
+
+        async function checkTransactions() {
+            if (!token) {
+                showResult('resultsCheck', '❌ Please login first', false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/transactions', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const transactionsInfo = data.transactions.map(txn => 
+                        `₹${txn.amount} to ${txn.merchant_name} - ${txn.status}`
+                    ).join('<br>');
+                    showResult('resultsCheck', `✅ Transactions (${data.transactions.length}):<br>${transactionsInfo || 'No transactions'}`);
+                } else {
+                    showResult('resultsCheck', `❌ Failed to get transactions: ${data.message}`, false);
+                }
+            } catch (error) {
+                showResult('resultsCheck', `❌ Transactions error: ${error.message}`, false);
+            }
+        }
+
+        async function checkBalances() {
+            if (!token) {
+                showResult('resultsCheck', '❌ Please login first', false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/categories', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const balancesInfo = data.categories.map(cat => 
+                        `${cat.name}: ₹${cat.current_balance}`
+                    ).join('<br>');
+                    showResult('resultsCheck', `✅ Current Balances:<br>${balancesInfo}`);
+                } else {
+                    showResult('resultsCheck', `❌ Failed to get balances: ${data.message}`, false);
+                }
+            } catch (error) {
+                showResult('resultsCheck', `❌ Balances error: ${error.message}`, false);
+            }
+        }
+    </script>
+</body>
+</html>

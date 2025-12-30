@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Registration with Phone</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background: #007bff; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .result { margin-top: 15px; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Registration with Phone Number</h1>
+    
+    <form id="registrationForm">
+        <div class="form-group">
+            <label for="name">Full Name:</label>
+            <input type="text" id="name" value="Test User" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" value="testuser@example.com" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="phone">Phone Number:</label>
+            <input type="tel" id="phone" value="9876543210" maxlength="10" pattern="[0-9]{10}" required>
+            <small>Enter 10-digit phone number (required for password recovery)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" value="TestPassword123!" required>
+        </div>
+        
+        <button type="submit" id="submitBtn">Register Account</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <h3>Test Flow:</h3>
+        <ol>
+            <li><strong>Register:</strong> Create account with phone number</li>
+            <li><strong>Logout:</strong> Clear session</li>
+            <li><strong>Forgot Password:</strong> Use phone number to reset password</li>
+            <li><strong>Login:</strong> Use new password to login</li>
+        </ol>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        function showResult(message, type = 'info') {
+            const result = document.getElementById('result');
+            result.innerHTML = message;
+            result.className = 'result ' + type;
+        }
+
+        document.getElementById('registrationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Registering...';
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                password: document.getElementById('password').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(`
+                        <strong>✅ Registration Successful!</strong><br>
+                        <strong>User ID:</strong> ${data.user.id}<br>
+                        <strong>Name:</strong> ${data.user.name}<br>
+                        <strong>Email:</strong> ${data.user.email}<br>
+                        <strong>Phone:</strong> ${data.user.phone}<br>
+                        <strong>Token:</strong> ${data.token.substring(0, 20)}...<br><br>
+                        <em>✅ Phone number saved! You can now use forgot password feature.</em><br><br>
+                        <strong>Next Steps:</strong><br>
+                        1. Open the forgot password test page<br>
+                        2. Use phone number: ${data.user.phone}<br>
+                        3. Test the OTP flow
+                    `, 'success');
+                    
+                    // Store token for testing
+                    localStorage.setItem('token', data.token);
+                    
+                } else {
+                    showResult(`❌ Registration Failed: ${data.message || data.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showResult(`❌ Network Error: ${error.message}`, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Register Account';
+            }
+        });
+
+        // Auto-generate unique email for testing
+        document.getElementById('email').value = `testuser${Date.now()}@example.com`;
+    </script>
+</body>
+</html>
