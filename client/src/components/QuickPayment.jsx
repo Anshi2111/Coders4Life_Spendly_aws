@@ -242,37 +242,55 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
         const category = getCategoryById(formData.categoryId) || 
           defaultCategories.find(c => c.id === formData.categoryId)
 
-        // Create transaction record
+        // Create transaction record with pending status first
         const transactionData = {
-          amount,
           category_id: formData.categoryId.startsWith('default-') ? null : formData.categoryId,
-          category_name: category?.name || 'Unknown',
+          amount,
           merchant_name: formData.merchantName || 'UPI Payment',
           merchant_upi: formData.upiId,
-          status: 'success',
           note: `Payment via ${formData.upiId}`
         }
 
         // Save to backend if real category
         if (!formData.categoryId.startsWith('default-')) {
           try {
-            console.log('💾 Saving transaction to backend...')
-            await api.post('/transactions', transactionData)
-            await loadData() // Refresh data
-            showToast(`Payment of ₹${amount} recorded successfully!`)
-            console.log('✅ Transaction saved successfully')
+            console.log('💾 Creating transaction in backend...')
+            
+            // Step 1: Create transaction (status: pending)
+            const createResponse = await api.post('/transactions', transactionData)
+            console.log('✅ Transaction created:', createResponse.data)
+            
+            const transactionId = createResponse.data.transaction?.id
+            if (!transactionId) {
+              throw new Error('No transaction ID returned')
+            }
+            
+            // Step 2: Update status to success (this deducts balance)
+            console.log('💾 Updating transaction status to success...')
+            await api.put(`/transactions/${transactionId}/status`, { status: 'success' })
+            console.log('✅ Transaction status updated to success')
+            
+            // Step 3: Refresh data
+            await loadData()
+            showToast(`Payment of ₹${amount.toLocaleString('en-IN')} completed successfully!`)
+            console.log('✅ Payment process completed successfully')
+            
           } catch (apiError) {
             console.error('❌ API Error:', apiError)
-            showToast('Payment completed but failed to save record', 'warning')
+            const errorMsg = apiError.response?.data?.message || apiError.userMessage || 'Failed to process payment'
+            showToast(errorMsg, 'error')
+            return // Don't close modal on error
           }
         } else {
           // For default categories, just add to local state
           addTransaction({
             id: `TXN${Date.now()}`,
             ...transactionData,
+            category_name: category?.name || 'Unknown',
+            status: 'success',
             created_at: new Date().toISOString()
           })
-          showToast(`Payment of ₹${amount} completed successfully!`)
+          showToast(`Payment of ₹${amount.toLocaleString('en-IN')} completed successfully!`)
           console.log('✅ Transaction added to local state')
         }
       } else {
