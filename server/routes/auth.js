@@ -1,22 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { getDatabase } = require('../database/init');
-
-const router = express.Router();
-
-// In-memory OTP storage (in production, use Redis or database)
-const otpStore = new Map();
-
-// Generate 6-digit OTP
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const https = require('https');
+const querystring = require('querystring');
+const url = require('url');
 const { getDatabase } = require('../database/init');
 
 const router = express.Router();
@@ -54,43 +42,73 @@ const sendSMS = async (phone, otp) => {
     
     console.log(`📱 Sending SMS to ${formattedPhone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}`);
     
-    // SMS API call (example for common Indian SMS providers)
-    const smsPayload = {
+    // In development, just log the OTP
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔧 DEV MODE - OTP for ${phone}: ${otp}`);
+      return { success: true };
+    }
+    
+    // For production, integrate with actual SMS API
+    const smsData = querystring.stringify({
       apikey: SMS_API_KEY,
       sender: SMS_SENDER_ID,
       numbers: formattedPhone,
       message: message,
-      route: 4 // Transactional route
-    };
-
-    const response = await fetch(SMS_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(smsPayload),
-      timeout: 10000 // 10 second timeout
+      route: 4
     });
-
-    const result = await response.json();
     
-    if (!response.ok) {
-      console.error('❌ SMS API error:', result);
-      throw new Error(`SMS API failed: ${result.message || 'Unknown error'}`);
-    }
-
-    console.log('✅ SMS sent successfully:', result.status || 'Success');
-    return { success: true };
+    const parsedUrl = url.parse(SMS_API_URL);
+    
+    return new Promise((resolve, reject) => {
+      const options = {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+        path: parsedUrl.path,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(smsData)
+        }
+      };
+      
+      const protocol = parsedUrl.protocol === 'https:' ? https : require('http');
+      
+      const req = protocol.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            if (res.statusCode === 200 && result.status === 'success') {
+              console.log('✅ SMS sent successfully');
+              resolve({ success: true });
+            } else {
+              console.error('❌ SMS API error:', result);
+              reject(new Error(`SMS API failed: ${result.message || 'Unknown error'}`));
+            }
+          } catch (parseError) {
+            console.error('❌ SMS response parse error:', parseError);
+            reject(new Error('Invalid SMS API response'));
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        console.error('❌ SMS request error:', error);
+        reject(error);
+      });
+      
+      req.setTimeout(10000, () => {
+        req.destroy();
+        reject(new Error('SMS request timeout'));
+      });
+      
+      req.write(smsData);
+      req.end();
+    });
 
   } catch (error) {
     console.error('❌ SMS sending failed:', error.message);
-    
-    // In development, log OTP for testing
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🔧 DEV MODE - OTP for ${phone}: ${otp}`);
-      return { success: true }; // Allow development to continue
-    }
-    
     throw error;
   }
 };
@@ -100,96 +118,100 @@ router.post('/register', async (req, res) => {
   try {
     const { email, password, name, phone } = req.body;
     
-    if (!email || !password) {
+    if (!email || !password || !name) {
       return res.status(400).json({ 
         error: 'Missing required fields',
-        message: 'Email and password are required'
+        message: 'Email, password, and name are required'
       });
     }
 
-    if (!phone) {
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
       return res.status(400).json({ 
-        error: 'Missing required fields',
-        message: 'Phone number is required'
+        error: 'Invalid email',
+        message: 'Please enter a valid email address'
       });
     }
 
-    // Validate phone number format (Indian mobile)
-    const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(phone)) {
-      return res.status(400).json({ 
-        error: 'Invalid phone number',
-        message: 'Phone number must be a valid 10-digit Indian mobile number'
-      });
-    }
-
+    // Validate password strength
     if (password.length < 6) {
       return res.status(400).json({ 
-        error: 'Invalid password',
+        error: 'Weak password',
         message: 'Password must be at least 6 characters long'
       });
     }
 
     const db = getDatabase();
     
-    // Check if user exists with email or phone
-    db.get('SELECT id FROM users WHERE email = ? OR phone = ?', [email, phone], async (err, row) => {
+    // Check if user already exists
+    db.get('SELECT id FROM users WHERE email = ?', [email], async (err, existingUser) => {
       if (err) {
         console.error('❌ Database error:', err);
         return res.status(500).json({ 
           error: 'Database error',
-          message: 'Failed to check user existence'
+          message: 'Failed to check existing user'
         });
       }
       
-      if (row) {
+      if (existingUser) {
         return res.status(409).json({ 
           error: 'User exists',
-          message: 'User with this email or phone number already exists'
+          message: 'User with this email already exists'
         });
       }
-
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
       
-      // Create user
-      db.run(
-        'INSERT INTO users (email, password, name, phone) VALUES (?, ?, ?, ?)',
-        [email, hashedPassword, name || '', phone],
-        function(err) {
-          if (err) {
-            console.error('❌ Failed to create user:', err);
-            return res.status(500).json({ 
-              error: 'Registration failed',
-              message: 'Failed to create user account'
+      try {
+        // Hash password
+        const saltRounds = 12;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        
+        // Insert user
+        db.run(
+          'INSERT INTO users (email, password, name, phone) VALUES (?, ?, ?, ?)',
+          [email, hashedPassword, name, phone || null],
+          function(err) {
+            if (err) {
+              console.error('❌ Failed to create user:', err);
+              return res.status(500).json({ 
+                error: 'Registration failed',
+                message: 'Failed to create user account'
+              });
+            }
+            
+            // Generate JWT token
+            const token = jwt.sign(
+              { userId: this.lastID, email },
+              process.env.JWT_SECRET,
+              { expiresIn: '7d' }
+            );
+            
+            console.log('✅ User registered:', email);
+            res.status(201).json({
+              message: 'User registered successfully',
+              token,
+              user: {
+                id: this.lastID,
+                email,
+                name,
+                phone: phone || null
+              }
             });
           }
-          
-          const token = jwt.sign(
-            { userId: this.lastID, email },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-          );
-          
-          console.log('✅ User registered:', email, phone);
-          res.status(201).json({
-            message: 'User registered successfully',
-            token,
-            user: {
-              id: this.lastID,
-              email,
-              name: name || '',
-              phone
-            }
-          });
-        }
-      );
+        );
+      } catch (hashError) {
+        console.error('❌ Password hashing error:', hashError);
+        res.status(500).json({ 
+          error: 'Registration failed',
+          message: 'Failed to process password'
+        });
+      }
     });
   } catch (error) {
     console.error('❌ Registration error:', error);
     res.status(500).json({ 
-      error: 'Server error',
-      message: 'Internal server error during registration'
+      error: 'Internal server error',
+      message: 'Registration failed'
     });
   }
 });
@@ -213,49 +235,59 @@ router.post('/login', (req, res) => {
         console.error('❌ Database error:', err);
         return res.status(500).json({ 
           error: 'Database error',
-          message: 'Failed to authenticate user'
+          message: 'Login failed'
         });
       }
       
       if (!user) {
         return res.status(401).json({ 
           error: 'Invalid credentials',
-          message: 'Email or password is incorrect'
+          message: 'Invalid email or password'
         });
       }
-
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ 
-          error: 'Invalid credentials',
-          message: 'Email or password is incorrect'
-        });
-      }
-
-      const token = jwt.sign(
-        { userId: user.id, email: user.email },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
       
-      console.log('✅ User logged in:', email);
-      res.json({
-        message: 'Login successful',
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          phone: user.phone,
-          salary: user.salary
+      try {
+        // Verify password
+        const isValidPassword = await bcrypt.compare(password, user.password);
+        
+        if (!isValidPassword) {
+          return res.status(401).json({ 
+            error: 'Invalid credentials',
+            message: 'Invalid email or password'
+          });
         }
-      });
+        
+        // Generate JWT token
+        const token = jwt.sign(
+          { userId: user.id, email: user.email },
+          process.env.JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        
+        console.log('✅ User logged in:', email);
+        res.json({
+          message: 'Login successful',
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            phone: user.phone
+          }
+        });
+      } catch (compareError) {
+        console.error('❌ Password comparison error:', compareError);
+        res.status(500).json({ 
+          error: 'Login failed',
+          message: 'Authentication error'
+        });
+      }
     });
   } catch (error) {
     console.error('❌ Login error:', error);
     res.status(500).json({ 
-      error: 'Server error',
-      message: 'Internal server error during login'
+      error: 'Internal server error',
+      message: 'Login failed'
     });
   }
 });
@@ -405,87 +437,8 @@ router.post('/verify-otp', (req, res) => {
       success: true,
       message: 'OTP verified successfully'
     });
-    
-    console.log(`✅ OTP verified for ${phone}`);
-    res.json({
-      success: true,
-      message: 'OTP verified successfully'
-    });
   } catch (error) {
     console.error('❌ Verify OTP error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Internal server error'
-    });
-  }
-});
-
-// Reset password
-router.post('/reset-password', async (req, res) => {
-  try {
-    const { phone, newPassword } = req.body;
-    
-    if (!phone || !newPassword) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Phone number and new password are required'
-      });
-    }
-
-    // Validate password
-    if (newPassword.length < 8) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Password must be at least 8 characters long'
-      });
-    }
-
-    const otpData = otpStore.get(phone);
-    
-    if (!otpData || !otpData.verified) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'OTP verification required'
-      });
-    }
-
-    const db = getDatabase();
-    
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
-    // Update password
-    db.run(
-      'UPDATE users SET password = ? WHERE phone = ?',
-      [hashedPassword, phone],
-      function(err) {
-        if (err) {
-          console.error('❌ Failed to update password:', err);
-          return res.status(500).json({ 
-            success: false,
-            error: 'Failed to update password'
-          });
-        }
-        
-        if (this.changes === 0) {
-          return res.status(404).json({ 
-            success: false,
-            error: 'User not found'
-          });
-        }
-        
-        // Clear OTP data
-        otpStore.delete(phone);
-        
-        console.log(`✅ Password reset for phone ${phone}`);
-        res.json({
-          success: true,
-          message: 'Password reset successfully'
-        });
-      }
-    );
-  } catch (error) {
-    console.error('❌ Reset password error:', error);
     res.status(500).json({ 
       success: false,
       error: 'Internal server error'
