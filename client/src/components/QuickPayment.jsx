@@ -478,7 +478,80 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
               <div className="space-y-3">
                 {/* Success Button */}
                 <button
-                  onClick={() => handlePaymentConfirmation(true)}
+                  onClick={async () => {
+                    console.log('🔥 BUTTON CLICKED - Starting payment confirmation')
+                    
+                    if (isProcessing) {
+                      console.log('⚠️ Already processing, ignoring click')
+                      return
+                    }
+                    
+                    try {
+                      setIsProcessing(true)
+                      console.log('💰 Processing payment confirmation...')
+                      
+                      const amount = parseFloat(formData.amount)
+                      console.log('💵 Amount:', amount)
+                      console.log('🏷️ Category ID:', formData.categoryId)
+                      console.log('🏪 Merchant UPI:', formData.upiId)
+                      
+                      // Create transaction data
+                      const transactionData = {
+                        category_id: formData.categoryId,
+                        amount: amount,
+                        merchant_name: formData.merchantName || 'UPI Payment',
+                        merchant_upi: formData.upiId,
+                        note: `Payment via ${formData.upiId}`
+                      }
+                      
+                      console.log('📝 Transaction data:', transactionData)
+                      
+                      // Step 1: Create transaction
+                      console.log('🚀 Creating transaction...')
+                      const createResponse = await api.post('/transactions', transactionData)
+                      console.log('✅ Create response:', createResponse.data)
+                      
+                      const transactionId = createResponse.data.transaction?.id
+                      console.log('🆔 Transaction ID:', transactionId)
+                      
+                      if (!transactionId) {
+                        throw new Error('No transaction ID returned')
+                      }
+                      
+                      // Step 2: Update to success
+                      console.log('🔄 Updating status to success...')
+                      const updateResponse = await api.put(`/transactions/${transactionId}/status`, { status: 'success' })
+                      console.log('✅ Update response:', updateResponse.data)
+                      
+                      // Step 3: Refresh data
+                      console.log('🔄 Refreshing data...')
+                      await loadData()
+                      
+                      // Show success message
+                      showToast(`Payment of ₹${amount.toLocaleString('en-IN')} completed successfully!`)
+                      console.log('🎉 Payment completed successfully!')
+                      
+                      // Close modal
+                      setTimeout(() => {
+                        setShowConfirmation(false)
+                        onClose()
+                      }, 1500)
+                      
+                    } catch (error) {
+                      console.error('❌ Payment error:', error)
+                      console.error('❌ Error details:', {
+                        message: error.message,
+                        response: error.response?.data,
+                        status: error.response?.status
+                      })
+                      
+                      const errorMsg = error.response?.data?.message || error.userMessage || 'Failed to process payment'
+                      showToast(errorMsg, 'error')
+                    } finally {
+                      setIsProcessing(false)
+                      console.log('🏁 Payment processing finished')
+                    }
+                  }}
                   disabled={isProcessing}
                   className={`w-full py-3 px-4 rounded-lg text-center transition-all ${
                     isProcessing 
