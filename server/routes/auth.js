@@ -43,8 +43,9 @@ const sendSMS = async (phone, otp) => {
     console.log(`📱 Sending SMS to ${formattedPhone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}`);
     
     // In development, just log the OTP
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || !SMS_API_KEY || !SMS_API_URL) {
       console.log(`🔧 DEV MODE - OTP for ${phone}: ${otp}`);
+      console.log(`📱 SMS would be sent to ${formattedPhone}: Your Spendly OTP is ${otp}. Valid for 5 minutes.`);
       return { success: true };
     }
     
