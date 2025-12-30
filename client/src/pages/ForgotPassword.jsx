@@ -66,9 +66,13 @@ function ForgotPassword() {
     } catch (err) {
       console.error('Send OTP error:', err)
       if (err.response?.status === 404) {
-        setError('Phone number not registered')
+        setError('Phone number not registered. Please register first or use a different number.')
+      } else if (err.response?.status === 400) {
+        setError(err.response.data?.error || 'Invalid phone number format')
+      } else if (err.response?.status === 500) {
+        setError('Server error. Please try again later.')
       } else {
-        setError('Failed to send OTP. Please try again.')
+        setError('Failed to send OTP. Please check your connection and try again.')
       }
     } finally {
       setLoading(false)
