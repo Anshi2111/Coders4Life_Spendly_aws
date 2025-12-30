@@ -1,0 +1,36 @@
+services:
+  # Backend API Service
+  - type: web
+    name: spendly-api
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_PATH
+        value: ./database.sqlite
+      - key: CORS_ORIGIN
+        fromService:
+          type: web
+          name: spendly-frontend
+          property: url
+
+  # Frontend Service
+  - type: web
+    name: spendly-frontend
+    env: static
+    plan: free
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: client/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: spendly-api
+          property: url
