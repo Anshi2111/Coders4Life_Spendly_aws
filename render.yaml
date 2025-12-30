@@ -8,26 +8,19 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
         value: ./database.sqlite
       - key: CORS_ORIGIN
-        fromService:
-          type: static
-          name: spendly-frontend
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://spendly-frontend.onrender.com
 
-  # Frontend Service
-  - type: static
+  # Frontend Service  
+  - type: web
     name: spendly-frontend
+    env: static
     buildCommand: cd client && npm install && npm run build
     staticPublishPath: client/dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: spendly-api
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://spendly-api.onrender.com
