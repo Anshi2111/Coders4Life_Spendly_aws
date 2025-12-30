@@ -1,0 +1,266 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: rgb(229 231 235);
+  }
+  
+  .dark * {
+    border-color: rgb(55 65 81);
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  .dark body {
+    @apply bg-gray-900 text-gray-100;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Button Components */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-95;
+  }
+  
+  .btn-primary {
+    @apply btn text-white shadow-sm;
+    background: linear-gradient(135deg, #0891B2 0%, #059669 50%, #2563EB 100%);
+  }
+  
+  .btn-primary:hover {
+    box-shadow: 0 4px 14px 0 rgba(8, 145, 178, 0.25);
+  }
+  
+  .btn-secondary {
+    @apply btn bg-green-500 text-white hover:bg-green-600 shadow-sm;
+  }
+  
+  .btn-success {
+    @apply btn bg-green-500 text-white hover:bg-green-600 shadow-sm;
+  }
+  
+  .btn-danger {
+    @apply btn bg-red-500 text-white hover:bg-red-600 shadow-sm;
+  }
+  
+  .btn-warning {
+    @apply btn bg-yellow-500 text-white hover:bg-yellow-600 shadow-sm;
+  }
+  
+  .btn-outline {
+    @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
+  }
+  
+  .dark .btn-outline {
+    @apply border-gray-600 bg-gray-800 text-gray-100 hover:bg-gray-700;
+  }
+  
+  .btn-ghost {
+    @apply btn text-gray-700 hover:bg-gray-100;
+  }
+  
+  .dark .btn-ghost {
+    @apply text-gray-300 hover:bg-gray-800;
+  }
+  
+  /* Input Components */
+  .input {
+    @apply flex h-11 w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200;
+  }
+  
+  .dark .input {
+    @apply border-gray-600 bg-gray-800 text-gray-100 placeholder:text-gray-400 focus:border-blue-400;
+  }
+  
+  .input-error {
+    @apply border-red-300 focus:border-red-500 focus:ring-red-500/20;
+  }
+  
+  .dark .input-error {
+    @apply border-red-600;
+  }
+  
+  .input-success {
+    @apply border-green-300 focus:border-green-500 focus:ring-green-500/20;
+  }
+  
+  .dark .input-success {
+    @apply border-green-600;
+  }
+  
+  /* Card Components */
+  .card {
+    @apply rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md;
+  }
+  
+  .dark .card {
+    @apply border-gray-700 bg-gray-800;
+  }
+  
+  .card-gradient {
+    @apply card;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  }
+  
+  .dark .card-gradient {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  }
+  
+  .card-brand {
+    @apply card text-white border-0;
+    background: linear-gradient(135deg, #0891B2 0%, #059669 50%, #2563EB 100%);
+    box-shadow: 0 4px 14px 0 rgba(8, 145, 178, 0.15);
+  }
+  
+  /* Balance Display Components */
+  .balance-positive {
+    @apply text-green-600;
+  }
+  
+  .dark .balance-positive {
+    @apply text-green-400;
+  }
+  
+  .balance-negative {
+    @apply text-red-600;
+  }
+  
+  .dark .balance-negative {
+    @apply text-red-400;
+  }
+  
+  .balance-warning {
+    @apply text-yellow-600;
+  }
+  
+  .dark .balance-warning {
+    @apply text-yellow-400;
+  }
+  
+  .balance-neutral {
+    @apply text-gray-600;
+  }
+  
+  .dark .balance-neutral {
+    @apply text-gray-400;
+  }
+  
+  /* Category Card Components */
+  .category-card {
+    @apply card hover:scale-[1.02] cursor-pointer transition-transform duration-200;
+  }
+  
+  .category-card-selected {
+    @apply category-card ring-2 ring-blue-500 border-blue-300;
+  }
+  
+  .dark .category-card-selected {
+    @apply border-blue-600;
+  }
+  
+  /* Progress Bar Components */
+  .progress-bar {
+    @apply w-full bg-gray-200 rounded-full h-2 overflow-hidden;
+  }
+  
+  .dark .progress-bar {
+    @apply bg-gray-700;
+  }
+  
+  .progress-fill {
+    @apply h-full transition-all duration-500 ease-out rounded-full;
+  }
+  
+  .progress-success {
+    @apply progress-fill;
+    background: linear-gradient(to right, #4ade80, #16a34a);
+  }
+  
+  .progress-warning {
+    @apply progress-fill;
+    background: linear-gradient(to right, #fbbf24, #d97706);
+  }
+  
+  .progress-danger {
+    @apply progress-fill;
+    background: linear-gradient(to right, #f87171, #dc2626);
+  }
+  
+  /* Toast Components */
+  .toast {
+    @apply fixed top-4 right-4 z-50 max-w-sm rounded-xl border bg-white p-4 shadow-lg;
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .dark .toast {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .toast-success {
+    @apply toast border-green-200 bg-green-50;
+  }
+  
+  .dark .toast-success {
+    @apply border-green-800 bg-green-900/20;
+  }
+  
+  .toast-error {
+    @apply toast border-red-200 bg-red-50;
+  }
+  
+  .dark .toast-error {
+    @apply border-red-800 bg-red-900/20;
+  }
+  
+  .toast-warning {
+    @apply toast border-yellow-200 bg-yellow-50;
+  }
+  
+  .dark .toast-warning {
+    @apply border-yellow-800 bg-yellow-900/20;
+  }
+  
+  /* Logo Components */
+  .logo-text {
+    background: linear-gradient(135deg, #0891B2 0%, #059669 50%, #2563EB 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    @apply font-bold;
+  }
+  
+  /* Animation Classes */
+  .animate-balance-update {
+    animation: balance-update 0.5s ease-in-out;
+  }
+  
+  @keyframes balance-update {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  
+  @keyframes slideUp {
+    0% { transform: translateY(10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .card {
+      @apply p-4;
+    }
+    
+    .btn {
+      @apply px-3 py-2 text-sm;
+    }
+  }
+}

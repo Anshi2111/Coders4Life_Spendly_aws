@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spendly Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            background: linear-gradient(135deg, #0891B2 0%, #059669 50%, #2563EB 100%);
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        h1 { font-size: 3em; margin-bottom: 20px; }
+        p { font-size: 1.2em; margin-bottom: 30px; }
+        .status { font-size: 1.5em; font-weight: bold; }
+        .links { margin-top: 30px; }
+        .links a {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .links a:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Spendly</h1>
+        <p class="status">✅ Server is Running!</p>
+        <p>Track • Save • Grow</p>
+        <p>Your personal finance companion is ready to use.</p>
+        
+        <div class="links">
+            <a href="/">Go to App</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+            <a href="/forgot-password">Forgot Password</a>
+        </div>
+        
+        <div style="margin-top: 40px; font-size: 0.9em; opacity: 0.8;">
+            <p>🖥️ Desktop: http://localhost:5173/</p>
+            <p>📱 Mobile: http://192.168.1.35:5173/</p>
+        </div>
+    </div>
+    
+    <script>
+        // Test API connectivity
+        fetch('/api/health')
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Backend connected:', data);
+            })
+            .catch(error => {
+                console.error('❌ Backend connection failed:', error);
+            });
+    </script>
+</body>
+</html>
