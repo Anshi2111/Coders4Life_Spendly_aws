@@ -85,6 +85,15 @@ function QRScanner({ isOpen, onClose, onScan }) {
         setError(null)
         setIsScanning(true)
 
+        // Wait for DOM element to be available
+        const qrReaderElement = document.getElementById('qr-reader')
+        if (!qrReaderElement) {
+          console.error('❌ QR reader element not found')
+          setError('Failed to initialize QR scanner. Please try again.')
+          setIsScanning(false)
+          return
+        }
+
         // Create scanner with production-ready configuration
         scanner = new Html5QrcodeScanner(
           "qr-reader",
@@ -147,8 +156,10 @@ function QRScanner({ isOpen, onClose, onScan }) {
       const hasPermission = await requestCameraPermission()
       if (!hasPermission) return
 
-      // Initialize scanner
-      await initScanner()
+      // Wait a bit for DOM to be ready
+      setTimeout(() => {
+        initScanner()
+      }, 100)
     }
 
     startScanning()

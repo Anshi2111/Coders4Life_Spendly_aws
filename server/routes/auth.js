@@ -446,4 +446,85 @@ router.post('/verify-otp', (req, res) => {
   }
 });
 
+// Reset password (after OTP verification)
+router.post('/reset-password', (req, res) => {
+  try {
+    const { phone, newPassword } = req.body;
+    
+    if (!phone || !newPassword) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Phone number and new password are required'
+      });
+    }
+
+    // Validate password strength
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Password must be at least 6 characters long'
+      });
+    }
+
+    const db = getDatabase();
+    
+    // Find user by phone
+    db.get('SELECT id FROM users WHERE phone = ?', [phone], async (err, user) => {
+      if (err) {
+        console.error('❌ Database error:', err);
+        return res.status(500).json({ 
+          success: false,
+          error: 'Database error'
+        });
+      }
+      
+      if (!user) {
+        return res.status(404).json({ 
+          success: false,
+          error: 'Phone number not registered'
+        });
+      }
+
+      try {
+        // Hash new password
+        const saltRounds = 12;
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+        
+        // Update password
+        db.run(
+          'UPDATE users SET password = ? WHERE phone = ?',
+          [hashedPassword, phone],
+          function(err) {
+            if (err) {
+              console.error('❌ Failed to update password:', err);
+              return res.status(500).json({ 
+                success: false,
+                error: 'Failed to update password'
+              });
+            }
+            
+            console.log(`✅ Password reset successfully for ${phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}`);
+            res.json({
+              success: true,
+              message: 'Password reset successfully'
+            });
+          }
+        );
+      } catch (hashError) {
+        console.error('❌ Password hashing error:', hashError);
+        res.status(500).json({ 
+          success: false,
+          error: 'Failed to process new password'
+        });
+      }
+    });
+  } catch (error) {
+    console.error('❌ Reset password error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;
