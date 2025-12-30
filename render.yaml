@@ -19,7 +19,7 @@ services:
         fromService:
           type: web
           name: spendly-frontend
-          property: url
+          envVarKey: RENDER_EXTERNAL_URL
 
   # Frontend Service
   - type: web
@@ -33,4 +33,4 @@ services:
         fromService:
           type: web
           name: spendly-api
-          property: url
+          envVarKey: RENDER_EXTERNAL_URL
