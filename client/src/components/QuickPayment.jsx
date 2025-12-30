@@ -100,6 +100,23 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
       setShowConfirmation(false)
       setShowPaymentApps(false)
       setSelectedPaymentApp('')
+      setIsProcessing(false)
+      setToast(null)
+      
+      // Clear any pending payment data
+      sessionStorage.removeItem('pendingPayment')
+      
+      console.log('🔄 Modal opened - state reset')
+    } else {
+      // Reset all state when modal closes
+      setShowConfirmation(false)
+      setShowPaymentApps(false)
+      setSelectedPaymentApp('')
+      setIsProcessing(false)
+      setToast(null)
+      sessionStorage.removeItem('pendingPayment')
+      
+      console.log('🔄 Modal closed - state reset')
     }
   }, [isOpen, availableCategories, preSelectedCategory])
 
@@ -204,12 +221,14 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
       const upiUrl = generateUPIUrl(app.scheme)
       console.log(`🚀 Redirecting to ${app.name}:`, upiUrl)
       
-      // Store payment data for confirmation
-      sessionStorage.setItem('pendingPayment', JSON.stringify({
+      // Store payment data for confirmation (with timestamp)
+      const paymentData = {
         ...formData,
         paymentApp: app.name,
         timestamp: Date.now()
-      }))
+      }
+      sessionStorage.setItem('pendingPayment', JSON.stringify(paymentData))
+      console.log('💾 Stored pending payment data:', paymentData)
 
       // Hide app selection and show confirmation
       setShowPaymentApps(false)
@@ -316,18 +335,30 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
 
   // Check for pending payment on component mount
   useEffect(() => {
+    if (!isOpen) return
+    
     const pendingPayment = sessionStorage.getItem('pendingPayment')
-    if (pendingPayment && isOpen) {
+    if (pendingPayment) {
       try {
         const paymentData = JSON.parse(pendingPayment)
-        // If payment is recent (within 5 minutes), show confirmation
-        if (Date.now() - paymentData.timestamp < 5 * 60 * 1000) {
-          setFormData({
-            ...paymentData,
+        console.log('🔍 Found pending payment:', paymentData)
+        
+        // Check if payment is recent (within 5 minutes) and matches current form
+        const isRecent = Date.now() - paymentData.timestamp < 5 * 60 * 1000
+        const matchesCurrentPayment = 
+          paymentData.amount === formData.amount &&
+          paymentData.categoryId === formData.categoryId &&
+          paymentData.upiId === formData.upiId
+        
+        if (isRecent && matchesCurrentPayment) {
+          console.log('✅ Restoring pending payment confirmation')
+          setFormData(prev => ({
+            ...prev,
             paymentApp: paymentData.paymentApp || ''
-          })
+          }))
           setShowConfirmation(true)
         } else {
+          console.log('🗑️ Clearing old/mismatched pending payment')
           sessionStorage.removeItem('pendingPayment')
         }
       } catch (error) {
@@ -335,7 +366,7 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
         sessionStorage.removeItem('pendingPayment')
       }
     }
-  }, [isOpen])
+  }, [isOpen, formData.amount, formData.categoryId, formData.upiId])
 
   const selectedCategory = getCategoryById(formData.categoryId) || 
     defaultCategories.find(c => c.id === formData.categoryId)
