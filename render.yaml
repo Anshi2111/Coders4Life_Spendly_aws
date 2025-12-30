@@ -3,7 +3,6 @@ services:
   - type: web
     name: spendly-api
     env: node
-    plan: free
     buildCommand: cd server && npm install
     startCommand: cd server && npm start
     envVars:
@@ -17,15 +16,13 @@ services:
         value: ./database.sqlite
       - key: CORS_ORIGIN
         fromService:
-          type: web
+          type: static
           name: spendly-frontend
           envVarKey: RENDER_EXTERNAL_URL
 
   # Frontend Service
-  - type: web
+  - type: static
     name: spendly-frontend
-    env: static
-    plan: free
     buildCommand: cd client && npm install && npm run build
     staticPublishPath: client/dist
     envVars:
