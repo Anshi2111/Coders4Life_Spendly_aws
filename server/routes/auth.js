@@ -166,49 +166,41 @@ router.post('/register', async (req, res) => {
       });
     }
     
-    try {
-      console.log('🔐 Hashing password...');
-      // Hash password
-      const saltRounds = 12;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
-      console.log('✅ Password hashed successfully');
-      
-      // Create user
-      const newUser = new User({
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        name: name.trim(),
-        phone: phone ? phone.trim() : null
-      });
+    console.log('🔐 Hashing password...');
+    // Hash password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    console.log('✅ Password hashed successfully');
+    
+    // Create user
+    const newUser = new User({
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      name: name.trim(),
+      phone: phone ? phone.trim() : null
+    });
 
-      const savedUser = await newUser.save();
-      console.log('✅ User created with ID:', savedUser._id);
-      
-      // Generate JWT token
-      const token = jwt.sign(
-        { userId: savedUser._id, email: savedUser.email },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-      
-      console.log('✅ User registered successfully:', email);
-      res.status(201).json({
-        message: 'User registered successfully',
-        token,
-        user: {
-          id: savedUser._id,
-          email: savedUser.email,
-          name: savedUser.name,
-          phone: savedUser.phone
-        }
-      });
-    } catch (hashError) {
-      console.error('❌ Password hashing error:', hashError);
-      res.status(500).json({ 
-        error: 'Registration failed',
-        message: 'Failed to process password: ' + hashError.message
-      });
-    }
+    const savedUser = await newUser.save();
+    console.log('✅ User created with ID:', savedUser._id);
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: savedUser._id, email: savedUser.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    console.log('✅ User registered successfully:', email);
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: savedUser._id,
+        email: savedUser.email,
+        name: savedUser.name,
+        phone: savedUser.phone
+      }
+    });
   } catch (error) {
     console.error('❌ Registration error:', error);
     res.status(500).json({ 
