@@ -1,249 +1,156 @@
 const express = require('express');
-const { getDatabase } = require('../database/init');
-const { authenticateToken } = require('../middleware/auth');
+const Transaction = require('../models/Transaction');
+const Category = require('../models/Category');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get all transactions for user
-router.get('/', authenticateToken, (req, res) => {
-  const db = getDatabase();
-  
-  db.all(
-    `SELECT t.*, c.name as category_name, c.color as category_color
-     FROM transactions t
-     JOIN categories c ON t.category_id = c.id
-     WHERE t.user_id = ?
-     ORDER BY t.created_at DESC
-     LIMIT 50`,
-    [req.user.userId],
-    (err, transactions) => {
-      if (err) {
-        console.error('❌ Database error:', err);
-        return res.status(500).json({ 
-          error: 'Database error',
-          message: 'Failed to fetch transactions'
-        });
-      }
-      
-      res.json({ transactions: transactions || [] });
-    }
-  );
+// Get user transactions
+router.get('/', auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, status, category_id } = req.query;
+    
+    const filter = { user_id: req.userId };
+    if (status) filter.status = status;
+    if (category_id) filter.category_id = category_id;
+    
+    const transactions = await Transaction.find(filter)
+      .populate('category_id', 'name color')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+    
+    const total = await Transaction.countDocuments(filter);
+    
+    res.json({
+      transactions,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      total
+    });
+  } catch (error) {
+    console.error('❌ Get transactions error:', error);
+    res.status(500).json({ error: 'Failed to get transactions' });
+  }
 });
 
 // Create transaction (initiate payment)
-router.post('/', authenticateToken, (req, res) => {
-  const { category_id, amount, merchant_upi, merchant_name, note } = req.body;
-  
-  if (!category_id || !amount || amount <= 0) {
-    return res.status(400).json({ 
-      error: 'Invalid data',
-      message: 'Category and valid amount are required'
-    });
-  }
-  
-  if (!merchant_upi) {
-    return res.status(400).json({ 
-      error: 'Invalid merchant',
-      message: 'Merchant UPI ID is required'
-    });
-  }
-  
-  const db = getDatabase();
-  
-  // Check category balance
-  db.get(
-    'SELECT current_balance FROM categories WHERE id = ? AND user_id = ?',
-    [category_id, req.user.userId],
-    (err, category) => {
-      if (err) {
-        console.error('❌ Database error:', err);
-        return res.status(500).json({ 
-          error: 'Database error',
-          message: 'Failed to check category balance'
-        });
-      }
-      
-      if (!category) {
-        return res.status(404).json({ 
-          error: 'Category not found',
-          message: 'Category not found or access denied'
-        });
-      }
-      
-      if (category.current_balance < amount) {
-        return res.status(400).json({ 
-          error: 'Insufficient balance',
-          message: `Insufficient balance in category. Available: ₹${category.current_balance}`
-        });
-      }
-      
-      // Generate transaction ID
-      const transactionId = 'TXN' + Date.now() + Math.random().toString(36).substr(2, 5);
-      
-      // Create transaction record
-      db.run(
-        `INSERT INTO transactions (user_id, category_id, amount, merchant_upi, merchant_name, transaction_id, status, note)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
-        [
-          req.user.userId,
-          category_id,
-          amount,
-          merchant_upi,
-          merchant_name || 'Unknown Merchant',
-          transactionId,
-          note || ''
-        ],
-        function(err) {
-          if (err) {
-            console.error('❌ Failed to create transaction:', err);
-            return res.status(500).json({ 
-              error: 'Transaction failed',
-              message: 'Failed to create transaction record'
-            });
-          }
-          
-          // Generate UPI intent URL
-          const upiUrl = `upi://pay?pa=${encodeURIComponent(merchant_upi)}&pn=${encodeURIComponent(merchant_name || 'Merchant')}&am=${amount}&cu=INR&tn=${encodeURIComponent(note || `Payment via Spendly - ${transactionId}`)}`;
-          
-          console.log('✅ Transaction created:', transactionId);
-          res.status(201).json({
-            message: 'Transaction initiated successfully',
-            transaction: {
-              id: this.lastID,
-              transaction_id: transactionId,
-              amount,
-              merchant_upi,
-              merchant_name: merchant_name || 'Unknown Merchant',
-              status: 'pending',
-              upi_url: upiUrl
-            }
-          });
-        }
-      );
+router.post('/', auth, async (req, res) => {
+  try {
+    const { category_id, amount, merchant_name, merchant_upi, note } = req.body;
+    
+    if (!category_id || !amount || !merchant_name) {
+      return res.status(400).json({ 
+        error: 'Category, amount, and merchant name are required' 
+      });
     }
-  );
+    
+    // Verify category belongs to user
+    const category = await Category.findOne({
+      _id: category_id,
+      user_id: req.userId,
+      is_active: true
+    });
+    
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    // Check if sufficient balance
+    if (amount > category.current_balance) {
+      return res.status(400).json({ 
+        error: 'Insufficient balance in category',
+        available: category.current_balance,
+        requested: amount
+      });
+    }
+    
+    const transaction = new Transaction({
+      user_id: req.userId,
+      category_id,
+      amount,
+      merchant_name: merchant_name.trim(),
+      merchant_upi: merchant_upi?.trim(),
+      note: note?.trim(),
+      status: 'pending'
+    });
+    
+    const savedTransaction = await transaction.save();
+    
+    res.status(201).json({
+      message: 'Transaction created successfully',
+      transaction: savedTransaction
+    });
+  } catch (error) {
+    console.error('❌ Create transaction error:', error);
+    res.status(500).json({ error: 'Failed to create transaction' });
+  }
 });
 
-// Update transaction status (after UPI payment)
-router.put('/:id/status', authenticateToken, (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-  
-  if (!['success', 'failed', 'cancelled'].includes(status)) {
-    return res.status(400).json({ 
-      error: 'Invalid status',
-      message: 'Status must be success, failed, or cancelled'
+// Update transaction status
+router.put('/:id/status', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['pending', 'success', 'failed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    
+    const transaction = await Transaction.findOne({
+      _id: req.params.id,
+      user_id: req.userId
     });
-  }
-  
-  const db = getDatabase();
-  
-  // Get transaction details
-  db.get(
-    'SELECT * FROM transactions WHERE id = ? AND user_id = ?',
-    [id, req.user.userId],
-    (err, transaction) => {
-      if (err) {
-        console.error('❌ Database error:', err);
-        return res.status(500).json({ 
-          error: 'Database error',
-          message: 'Failed to fetch transaction'
-        });
-      }
-      
-      if (!transaction) {
-        return res.status(404).json({ 
-          error: 'Transaction not found',
-          message: 'Transaction not found or access denied'
-        });
-      }
-      
-      if (transaction.status !== 'pending') {
-        return res.status(400).json({ 
-          error: 'Transaction already processed',
-          message: 'Transaction status cannot be changed'
-        });
-      }
-      
-      // Update transaction status
-      db.run(
-        'UPDATE transactions SET status = ? WHERE id = ?',
-        [status, id],
-        function(err) {
-          if (err) {
-            console.error('❌ Failed to update transaction:', err);
-            return res.status(500).json({ 
-              error: 'Update failed',
-              message: 'Failed to update transaction status'
-            });
-          }
-          
-          // If successful, deduct from category balance
-          if (status === 'success') {
-            db.run(
-              'UPDATE categories SET current_balance = current_balance - ? WHERE id = ?',
-              [transaction.amount, transaction.category_id],
-              (err) => {
-                if (err) {
-                  console.error('❌ Failed to update balance:', err);
-                  // Rollback transaction status
-                  db.run('UPDATE transactions SET status = "pending" WHERE id = ?', [id]);
-                  return res.status(500).json({ 
-                    error: 'Balance update failed',
-                    message: 'Failed to update category balance'
-                  });
-                }
-                
-                console.log('✅ Transaction completed:', transaction.transaction_id);
-                res.json({ 
-                  message: 'Transaction completed successfully',
-                  status 
-                });
-              }
-            );
-          } else {
-            console.log('✅ Transaction cancelled/failed:', transaction.transaction_id);
-            res.json({ 
-              message: 'Transaction status updated',
-              status 
-            });
-          }
-        }
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // If marking as success, deduct from category balance
+    if (status === 'success' && transaction.status === 'pending') {
+      await Category.findByIdAndUpdate(
+        transaction.category_id,
+        { $inc: { current_balance: -transaction.amount } }
       );
     }
-  );
+    
+    // If marking as failed/cancelled from success, refund to category
+    if ((status === 'failed' || status === 'cancelled') && transaction.status === 'success') {
+      await Category.findByIdAndUpdate(
+        transaction.category_id,
+        { $inc: { current_balance: transaction.amount } }
+      );
+    }
+    
+    transaction.status = status;
+    await transaction.save();
+    
+    res.json({
+      message: 'Transaction status updated successfully',
+      transaction
+    });
+  } catch (error) {
+    console.error('❌ Update transaction status error:', error);
+    res.status(500).json({ error: 'Failed to update transaction status' });
+  }
 });
 
-// Get transaction by ID
-router.get('/:id', authenticateToken, (req, res) => {
-  const { id } = req.params;
-  const db = getDatabase();
-  
-  db.get(
-    `SELECT t.*, c.name as category_name, c.color as category_color
-     FROM transactions t
-     JOIN categories c ON t.category_id = c.id
-     WHERE t.id = ? AND t.user_id = ?`,
-    [id, req.user.userId],
-    (err, transaction) => {
-      if (err) {
-        console.error('❌ Database error:', err);
-        return res.status(500).json({ 
-          error: 'Database error',
-          message: 'Failed to fetch transaction'
-        });
-      }
-      
-      if (!transaction) {
-        return res.status(404).json({ 
-          error: 'Transaction not found',
-          message: 'Transaction not found or access denied'
-        });
-      }
-      
-      res.json({ transaction });
+// Get transaction details
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const transaction = await Transaction.findOne({
+      _id: req.params.id,
+      user_id: req.userId
+    }).populate('category_id', 'name color');
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
     }
-  );
+    
+    res.json(transaction);
+  } catch (error) {
+    console.error('❌ Get transaction error:', error);
+    res.status(500).json({ error: 'Failed to get transaction' });
+  }
 });
 
 module.exports = router;
