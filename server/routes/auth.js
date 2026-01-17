@@ -14,9 +14,14 @@ router.get('/test', (req, res) => {
 router.post('/register', async (req, res) => {
   console.log('📥 Register endpoint hit');
   console.log('📥 Request body:', req.body);
+  console.log('📥 Headers:', req.headers);
   
   try {
+    // Test 1: Basic response
+    console.log('✅ Step 1: Endpoint reached');
+    
     const { email, password, name, phone } = req.body;
+    console.log('✅ Step 2: Destructured body');
     
     // Basic validation
     if (!email || !password || !name) {
@@ -28,10 +33,15 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    console.log('✅ Basic validation passed');
+    console.log('✅ Step 3: Basic validation passed');
 
+    // Test MongoDB connection before querying
+    console.log('✅ Step 4: Testing MongoDB query...');
+    
     // Check if user exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
+    console.log('✅ Step 5: MongoDB query completed, result:', !!existingUser);
+    
     if (existingUser) {
       console.log('❌ User already exists');
       return res.status(409).json({ 
@@ -41,13 +51,15 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    console.log('✅ User does not exist, creating new user');
+    console.log('✅ Step 6: User does not exist, proceeding...');
 
     // Hash password
+    console.log('✅ Step 7: Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log('✅ Password hashed');
+    console.log('✅ Step 8: Password hashed');
 
     // Create user
+    console.log('✅ Step 9: Creating user object...');
     const newUser = new User({
       email: email.toLowerCase(),
       password: hashedPassword,
@@ -55,17 +67,19 @@ router.post('/register', async (req, res) => {
       phone: phone ? phone.trim() : null
     });
 
+    console.log('✅ Step 10: Saving user to database...');
     const savedUser = await newUser.save();
-    console.log('✅ User saved to database:', savedUser._id);
+    console.log('✅ Step 11: User saved to database:', savedUser._id);
 
     // Generate token
+    console.log('✅ Step 12: Generating JWT token...');
     const token = jwt.sign(
       { userId: savedUser._id, email: savedUser.email },
       process.env.JWT_SECRET || 'fallback-secret-key',
       { expiresIn: '7d' }
     );
 
-    console.log('✅ Token generated');
+    console.log('✅ Step 13: Token generated, sending response...');
 
     res.status(201).json({
       success: true,
@@ -79,12 +93,18 @@ router.post('/register', async (req, res) => {
       }
     });
 
+    console.log('✅ Step 14: Response sent successfully');
+
   } catch (error) {
-    console.error('❌ Registration error:', error);
+    console.error('❌ Registration error at step:', error.message);
+    console.error('❌ Full error:', error);
+    console.error('❌ Stack trace:', error.stack);
+    
     res.status(500).json({ 
       success: false,
       error: 'Registration failed',
-      message: error.message
+      message: error.message,
+      step: 'Error occurred during registration process'
     });
   }
 });
