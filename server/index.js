@@ -8,7 +8,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const categoryRoutes = require('./routes/categories');
 const transactionRoutes = require('./routes/transactions');
-const { initializeDatabase } = require('./database/init');
+const { connectToMongoDB } = require('./database/mongodb');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -106,9 +106,9 @@ app.use('*', (req, res) => {
 // Initialize database and start server
 async function startServer() {
   try {
-    console.log('🗄️  Initializing database...');
-    await initializeDatabase();
-    console.log('✅ Database initialized successfully');
+    console.log('🗄️  Initializing MongoDB connection...');
+    await connectToMongoDB();
+    console.log('✅ MongoDB initialized successfully');
     
     // Listen on 0.0.0.0 - MANDATORY for mobile/tunnel access
     const server = app.listen(PORT, '0.0.0.0', () => {

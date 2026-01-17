@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const https = require('https');
 const querystring = require('querystring');
 const url = require('url');
-const { getDatabase } = require('../database/init');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -155,92 +155,60 @@ router.post('/register', async (req, res) => {
     }
 
     console.log('✅ Validation passed for registration');
-    const db = getDatabase();
     
     // Check if user already exists
-    db.get('SELECT id FROM users WHERE email = ?', [email], async (err, existingUser) => {
-      try {
-        if (err) {
-          console.error('❌ Database error during user check:', err);
-          return res.status(500).json({ 
-            error: 'Database error',
-            message: 'Failed to check existing user: ' + err.message
-          });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      console.log('❌ User already exists:', email);
+      return res.status(409).json({ 
+        error: 'User exists',
+        message: 'User with this email already exists'
+      });
+    }
+    
+    try {
+      console.log('🔐 Hashing password...');
+      // Hash password
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      console.log('✅ Password hashed successfully');
+      
+      // Create user
+      const newUser = new User({
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        name: name.trim(),
+        phone: phone ? phone.trim() : null
+      });
+
+      const savedUser = await newUser.save();
+      console.log('✅ User created with ID:', savedUser._id);
+      
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: savedUser._id, email: savedUser.email },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      
+      console.log('✅ User registered successfully:', email);
+      res.status(201).json({
+        message: 'User registered successfully',
+        token,
+        user: {
+          id: savedUser._id,
+          email: savedUser.email,
+          name: savedUser.name,
+          phone: savedUser.phone
         }
-        
-        if (existingUser) {
-          console.log('❌ User already exists:', email);
-          return res.status(409).json({ 
-            error: 'User exists',
-            message: 'User with this email already exists'
-          });
-        }
-        
-        try {
-          console.log('🔐 Hashing password...');
-          // Hash password
-          const saltRounds = 12;
-          const hashedPassword = await bcrypt.hash(password, saltRounds);
-          console.log('✅ Password hashed successfully');
-          
-          // Insert user
-          db.run(
-            'INSERT INTO users (email, password, name, phone) VALUES (?, ?, ?, ?)',
-            [email, hashedPassword, name, phone || null],
-            function(err) {
-              try {
-                if (err) {
-                  console.error('❌ Failed to create user:', err);
-                  return res.status(500).json({ 
-                    error: 'Registration failed',
-                    message: 'Failed to create user account: ' + err.message
-                  });
-                }
-                
-                console.log('✅ User created with ID:', this.lastID);
-                
-                // Generate JWT token
-                const token = jwt.sign(
-                  { userId: this.lastID, email },
-                  process.env.JWT_SECRET,
-                  { expiresIn: '7d' }
-                );
-                
-                console.log('✅ User registered successfully:', email);
-                res.status(201).json({
-                  message: 'User registered successfully',
-                  token,
-                  user: {
-                    id: this.lastID,
-                    email,
-                    name,
-                    phone: phone || null
-                  }
-                });
-              } catch (tokenError) {
-                console.error('❌ Token generation error:', tokenError);
-                res.status(500).json({ 
-                  error: 'Registration failed',
-                  message: 'Failed to generate token: ' + tokenError.message
-                });
-              }
-            }
-          );
-        } catch (hashError) {
-          console.error('❌ Password hashing error:', hashError);
-          res.status(500).json({ 
-            error: 'Registration failed',
-            message: 'Failed to process password: ' + hashError.message
-          });
-        }
-      } catch (innerError) {
-        console.error('❌ Inner error in register:', innerError);
-        res.status(500).json({ 
-          error: 'Registration failed',
-          message: 'Internal error: ' + innerError.message
-        });
-      }
-    });
+      });
+    } catch (hashError) {
+      console.error('❌ Password hashing error:', hashError);
+      res.status(500).json({ 
+        error: 'Registration failed',
+        message: 'Failed to process password: ' + hashError.message
+      });
+    }
   } catch (error) {
     console.error('❌ Registration error:', error);
     res.status(500).json({ 
@@ -251,7 +219,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
@@ -262,61 +230,51 @@ router.post('/login', (req, res) => {
       });
     }
 
-    const db = getDatabase();
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(401).json({ 
+        error: 'Invalid credentials',
+        message: 'Invalid email or password'
+      });
+    }
     
-    db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
-      if (err) {
-        console.error('❌ Database error:', err);
-        return res.status(500).json({ 
-          error: 'Database error',
-          message: 'Login failed'
-        });
-      }
+    try {
+      // Verify password
+      const isValidPassword = await bcrypt.compare(password, user.password);
       
-      if (!user) {
+      if (!isValidPassword) {
         return res.status(401).json({ 
           error: 'Invalid credentials',
           message: 'Invalid email or password'
         });
       }
       
-      try {
-        // Verify password
-        const isValidPassword = await bcrypt.compare(password, user.password);
-        
-        if (!isValidPassword) {
-          return res.status(401).json({ 
-            error: 'Invalid credentials',
-            message: 'Invalid email or password'
-          });
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user._id, email: user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      
+      console.log('✅ User logged in:', email);
+      res.json({
+        message: 'Login successful',
+        token,
+        user: {
+          id: user._id,
+          email: user.email,
+          name: user.name,
+          phone: user.phone
         }
-        
-        // Generate JWT token
-        const token = jwt.sign(
-          { userId: user.id, email: user.email },
-          process.env.JWT_SECRET,
-          { expiresIn: '7d' }
-        );
-        
-        console.log('✅ User logged in:', email);
-        res.json({
-          message: 'Login successful',
-          token,
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            phone: user.phone
-          }
-        });
-      } catch (compareError) {
-        console.error('❌ Password comparison error:', compareError);
-        res.status(500).json({ 
-          error: 'Login failed',
-          message: 'Authentication error'
-        });
-      }
-    });
+      });
+    } catch (compareError) {
+      console.error('❌ Password comparison error:', compareError);
+      res.status(500).json({ 
+        error: 'Login failed',
+        message: 'Authentication error'
+      });
+    }
   } catch (error) {
     console.error('❌ Login error:', error);
     res.status(500).json({ 
@@ -352,76 +310,58 @@ router.post('/send-otp', async (req, res) => {
     }
 
     console.log('✅ Phone validation passed:', phone);
-    const db = getDatabase();
     
     // Check if user exists with this phone number
-    db.get('SELECT id, email FROM users WHERE phone = ?', [phone], async (err, user) => {
-      try {
-        if (err) {
-          console.error('❌ Database error:', err);
-          return res.status(500).json({ 
-            success: false,
-            error: 'Database error: ' + err.message
-          });
-        }
-        
-        if (!user) {
-          console.log('❌ Phone number not found in database:', phone);
-          return res.status(404).json({ 
-            success: false,
-            error: 'Phone number not registered'
-          });
-        }
+    const user = await User.findOne({ phone: phone });
+    if (!user) {
+      console.log('❌ Phone number not found in database:', phone);
+      return res.status(404).json({ 
+        success: false,
+        error: 'Phone number not registered'
+      });
+    }
 
-        console.log('✅ User found for phone:', phone);
+    console.log('✅ User found for phone:', phone);
 
-        // Generate OTP
-        const otp = generateOTP();
-        const hashedOTP = hashOTP(otp);
-        const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-        
-        // Store hashed OTP securely
-        otpStore.set(phone, {
-          otp: hashedOTP, // Store hashed version
-          expiresAt,
-          attempts: 0,
-          verified: false
-        });
-
-        console.log('✅ OTP generated and stored for:', phone);
-
-        try {
-          // Send SMS
-          const smsResult = await sendSMS(phone, otp);
-          
-          if (!smsResult.success) {
-            throw new Error('SMS sending failed');
-          }
-          
-          console.log(`✅ OTP sent to ${phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}`);
-          res.json({
-            success: true,
-            message: 'OTP sent successfully'
-          });
-        } catch (smsError) {
-          console.error('❌ SMS sending failed:', smsError.message);
-          
-          // Remove OTP from store if SMS failed
-          otpStore.delete(phone);
-          
-          res.status(500).json({ 
-            success: false,
-            error: 'Unable to send OTP. Please try again later.'
-          });
-        }
-      } catch (innerError) {
-        console.error('❌ Inner error in send-otp:', innerError);
-        res.status(500).json({ 
-          success: false,
-          error: 'Internal error: ' + innerError.message
-        });
-      }
+    // Generate OTP
+    const otp = generateOTP();
+    const hashedOTP = hashOTP(otp);
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+    
+    // Store hashed OTP securely
+    otpStore.set(phone, {
+      otp: hashedOTP, // Store hashed version
+      expiresAt,
+      attempts: 0,
+      verified: false
     });
+
+    console.log('✅ OTP generated and stored for:', phone);
+
+    try {
+      // Send SMS
+      const smsResult = await sendSMS(phone, otp);
+      
+      if (!smsResult.success) {
+        throw new Error('SMS sending failed');
+      }
+      
+      console.log(`✅ OTP sent to ${phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}`);
+      res.json({
+        success: true,
+        message: 'OTP sent successfully'
+      });
+    } catch (smsError) {
+      console.error('❌ SMS sending failed:', smsError.message);
+      
+      // Remove OTP from store if SMS failed
+      otpStore.delete(phone);
+      
+      res.status(500).json({ 
+        success: false,
+        error: 'Unable to send OTP. Please try again later.'
+      });
+    }
   } catch (error) {
     console.error('❌ Send OTP error:', error);
     res.status(500).json({ 
@@ -499,7 +439,7 @@ router.post('/verify-otp', (req, res) => {
 });
 
 // Reset password (after OTP verification)
-router.post('/reset-password', (req, res) => {
+router.post('/reset-password', async (req, res) => {
   try {
     const { phone, newPassword } = req.body;
     
@@ -518,58 +458,35 @@ router.post('/reset-password', (req, res) => {
       });
     }
 
-    const db = getDatabase();
-    
     // Find user by phone
-    db.get('SELECT id FROM users WHERE phone = ?', [phone], async (err, user) => {
-      if (err) {
-        console.error('❌ Database error:', err);
-        return res.status(500).json({ 
-          success: false,
-          error: 'Database error'
-        });
-      }
-      
-      if (!user) {
-        return res.status(404).json({ 
-          success: false,
-          error: 'Phone number not registered'
-        });
-      }
+    const user = await User.findOne({ phone: phone });
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Phone number not registered'
+      });
+    }
 
-      try {
-        // Hash new password
-        const saltRounds = 12;
-        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-        
-        // Update password
-        db.run(
-          'UPDATE users SET password = ? WHERE phone = ?',
-          [hashedPassword, phone],
-          function(err) {
-            if (err) {
-              console.error('❌ Failed to update password:', err);
-              return res.status(500).json({ 
-                success: false,
-                error: 'Failed to update password'
-              });
-            }
-            
-            console.log(`✅ Password reset successfully for ${phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}`);
-            res.json({
-              success: true,
-              message: 'Password reset successfully'
-            });
-          }
-        );
-      } catch (hashError) {
-        console.error('❌ Password hashing error:', hashError);
-        res.status(500).json({ 
-          success: false,
-          error: 'Failed to process new password'
-        });
-      }
-    });
+    try {
+      // Hash new password
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+      
+      // Update password
+      await User.findByIdAndUpdate(user._id, { password: hashedPassword });
+      
+      console.log(`✅ Password reset successfully for ${phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}`);
+      res.json({
+        success: true,
+        message: 'Password reset successfully'
+      });
+    } catch (hashError) {
+      console.error('❌ Password hashing error:', hashError);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to process new password'
+      });
+    }
   } catch (error) {
     console.error('❌ Reset password error:', error);
     res.status(500).json({ 
