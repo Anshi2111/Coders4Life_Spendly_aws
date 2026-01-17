@@ -16,23 +16,50 @@ router.get('/test-db', async (req, res) => {
   
   try {
     console.log('✅ Testing MongoDB connection...');
+    console.log('✅ MongoDB URI format check...');
     
-    // Try to count users (simple query)
+    // Test basic connection first
+    const mongoose = require('mongoose');
+    console.log('✅ Mongoose connection state:', mongoose.connection.readyState);
+    console.log('✅ Database name:', mongoose.connection.db?.databaseName);
+    
+    // Try a very simple operation first
+    console.log('✅ Attempting simple database operation...');
+    
+    // Instead of User.countDocuments(), let's try a raw MongoDB operation
+    const db = mongoose.connection.db;
+    const collections = await db.listCollections().toArray();
+    console.log('✅ Available collections:', collections.map(c => c.name));
+    
+    // Try to create the users collection if it doesn't exist
+    if (!collections.find(c => c.name === 'users')) {
+      console.log('✅ Creating users collection...');
+      await db.createCollection('users');
+    }
+    
+    // Now try to count documents
     const userCount = await User.countDocuments();
     console.log('✅ MongoDB query successful, user count:', userCount);
     
     res.json({
       success: true,
       message: 'MongoDB connection working',
+      database: mongoose.connection.db?.databaseName,
+      collections: collections.map(c => c.name),
       userCount: userCount
     });
 
   } catch (error) {
     console.error('❌ MongoDB test error:', error);
+    console.error('❌ Error name:', error.name);
+    console.error('❌ Error code:', error.code);
+    
     res.status(500).json({ 
       success: false,
       error: 'MongoDB connection failed',
-      message: error.message
+      message: error.message,
+      errorName: error.name,
+      errorCode: error.code
     });
   }
 });
