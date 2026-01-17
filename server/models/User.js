@@ -34,8 +34,8 @@ const userSchema = new mongoose.Schema({
   timestamps: true // Adds createdAt and updatedAt
 });
 
-// Indexes for better performance
-userSchema.index({ email: 1 });
-userSchema.index({ phone: 1 });
+// Remove duplicate indexes - unique: true already creates indexes
+// userSchema.index({ email: 1 });
+// userSchema.index({ phone: 1 });
 
 module.exports = mongoose.model('User', userSchema);
