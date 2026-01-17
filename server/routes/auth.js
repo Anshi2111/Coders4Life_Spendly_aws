@@ -10,6 +10,65 @@ router.get('/test', (req, res) => {
   res.json({ message: 'Auth routes working', timestamp: new Date().toISOString() });
 });
 
+// Test MongoDB connection
+router.get('/test-db', async (req, res) => {
+  console.log('📥 Test DB endpoint hit');
+  
+  try {
+    console.log('✅ Testing MongoDB connection...');
+    
+    // Try to count users (simple query)
+    const userCount = await User.countDocuments();
+    console.log('✅ MongoDB query successful, user count:', userCount);
+    
+    res.json({
+      success: true,
+      message: 'MongoDB connection working',
+      userCount: userCount
+    });
+
+  } catch (error) {
+    console.error('❌ MongoDB test error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'MongoDB connection failed',
+      message: error.message
+    });
+  }
+});
+
+// Simple test registration (no MongoDB)
+router.post('/test-register', (req, res) => {
+  console.log('📥 Test register endpoint hit');
+  console.log('📥 Request body:', req.body);
+  
+  try {
+    const { email, password, name } = req.body;
+    
+    if (!email || !password || !name) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Missing required fields'
+      });
+    }
+
+    // Just return success without database
+    res.status(201).json({
+      success: true,
+      message: 'Test registration successful (no database)',
+      data: { email, name }
+    });
+
+  } catch (error) {
+    console.error('❌ Test registration error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Test registration failed',
+      message: error.message
+    });
+  }
+});
+
 // Register
 router.post('/register', async (req, res) => {
   console.log('📥 Register endpoint hit');
