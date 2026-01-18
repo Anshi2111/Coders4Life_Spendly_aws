@@ -56,7 +56,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Startup logs - MANDATORY
-console.log('🚀 Starting Spendly Server...');
+console.log('🚀 Starting SmartKharch Server...');
 console.log('📅 Started at:', new Date().toISOString());
 console.log('🌍 Environment:', process.env.NODE_ENV);
 console.log('🔧 Port:', PORT);

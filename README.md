@@ -1,4 +1,4 @@
-# Spendly - Personal Finance App for India
+# SmartKharch - Personal Finance App for India
 
 A production-ready personal finance management application with real UPI payment integration, built specifically for Indian users.
 
@@ -6,7 +6,7 @@ A production-ready personal finance management application with real UPI payment
 
 🎥 **[Watch App Demo & Overview on LinkedIn](https://www.linkedin.com/posts/sumit-singh-860594328_buildwithkiroathackxios2k25-hackxios2k25-activity-7411707141197193217-UF4Q?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAFMR6PMBpMBe3G0eI3xmbz5VI-idwhPi1U4)**
 
-See Spendly in action! This LinkedIn post showcases the complete app functionality, UPI payment integration, and user experience.
+See SmartKharch in action! This LinkedIn post showcases the complete app functionality, UPI payment integration, and user experience.
 
 ## 🚀 Features
 
@@ -52,14 +52,14 @@ See Spendly in action! This LinkedIn post showcases the complete app functionali
 
 ## 📱 UPI Payment Flow
 
-1. User enters payment details in Spendly
+1. User enters payment details in SmartKharch
 2. App generates UPI intent URL: `upi://pay?pa=merchant@upi&am=100&cu=INR`
 3. Device redirects to installed UPI app (Google Pay, PhonePe, etc.)
 4. User completes payment in UPI app
-5. User returns to Spendly and updates transaction status
+5. User returns to SmartKharch and updates transaction status
 6. Category balance is automatically updated
 
-**Security Note**: Spendly never handles actual payments or accesses banking credentials.
+**Security Note**: SmartKharch never handles actual payments or accesses banking credentials.
 
 ## 🚀 Quick Start
 
@@ -72,7 +72,7 @@ See Spendly in action! This LinkedIn post showcases the complete app functionali
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd spendly
+   cd smartkharch
    ```
 
 2. **Install dependencies**
@@ -138,19 +138,19 @@ See Spendly in action! This LinkedIn post showcases the complete app functionali
 2. **Create tunnels**:
    ```bash
    # Terminal 1: Backend tunnel
-   lt --port 5000 --subdomain spendly-api
+   lt --port 5000 --subdomain smartkharch-api
    
    # Terminal 2: Frontend tunnel  
-   lt --port 5173 --subdomain spendly-app
+   lt --port 5173 --subdomain smartkharch-app
    ```
 
 3. **Update environment variables**:
    ```env
    # In client/.env
-   VITE_API_URL=https://spendly-api.loca.lt
+   VITE_API_URL=https://smartkharch-api.loca.lt
    
    # In server/.env
-   CORS_ORIGIN=https://spendly-app.loca.lt
+   CORS_ORIGIN=https://smartkharch-app.loca.lt
    ```
 
 ## 📊 API Endpoints
@@ -304,9 +304,9 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions includ
 - Troubleshooting guide
 
 ### Production URLs
-- **Frontend**: `https://spendly-frontend.onrender.com`
-- **Backend API**: `https://spendly-api.onrender.com`
-- **Health Check**: `https://spendly-api.onrender.com/health`
+- **Frontend**: `https://smartkharch-frontend.onrender.com`
+- **Backend API**: `https://smartkharch-api.onrender.com`
+- **Health Check**: `https://smartkharch-api.onrender.com/health`
 
 ## 📄 License
 
@@ -361,4 +361,4 @@ This will show detailed error messages and request logs.
 
 ---
 
-**Built with ❤️ for Indian users by the Spendly team**
+**Built with ❤️ for Indian users by the SmartKharch team**

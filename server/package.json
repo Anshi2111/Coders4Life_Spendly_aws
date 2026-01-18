@@ -1,7 +1,7 @@
 {
-  "name": "spendly-server",
+  "name": "smartkharch-server",
   "version": "1.0.0",
-  "description": "Spendly Backend API",
+  "description": "SmartKharch Backend API",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

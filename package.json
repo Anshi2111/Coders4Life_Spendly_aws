@@ -1,5 +1,5 @@
 {
-  "name": "spendly",
+  "name": "smartkharch",
   "version": "1.0.0",
   "description": "Personal Finance App for India with UPI Payments",
   "main": "server/index.js",
@@ -12,7 +12,7 @@
     "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },
   "keywords": ["finance", "upi", "india", "payments"],
-  "author": "Spendly Team",
+  "author": "SmartKharch Team",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2"

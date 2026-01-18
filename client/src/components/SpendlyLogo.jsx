@@ -1,7 +1,7 @@
 import React from 'react'
 import { Wallet } from 'lucide-react'
 
-const SpendlyLogo = ({ size = 'md', showText = true, showTagline = false, className = '' }) => {
+const SmartKharchLogo = ({ size = 'md', showText = true, showTagline = false, className = '' }) => {
   const sizeClasses = {
     sm: {
       icon: 'h-6 w-6',
@@ -47,7 +47,7 @@ const SpendlyLogo = ({ size = 'md', showText = true, showTagline = false, classN
       {showText && (
         <div className="flex flex-col">
           <h1 className={`${currentSize.text} font-bold logo-text leading-none`}>
-            Spendly
+            SmartKharch
           </h1>
           {showTagline && (
             <p className={`${currentSize.tagline} text-gray-600 dark:text-gray-400 font-medium tracking-wide`}>
@@ -60,4 +60,4 @@ const SpendlyLogo = ({ size = 'md', showText = true, showTagline = false, classN
   )
 }
 
-export default SpendlyLogo
+export default SmartKharchLogo

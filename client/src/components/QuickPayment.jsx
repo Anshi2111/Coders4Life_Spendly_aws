@@ -199,7 +199,7 @@ function QuickPayment({ isOpen, onClose, preSelectedCategory }) {
       pn: merchantName || 'Merchant',
       am: amount,
       cu: 'INR',
-      tn: `Payment from ${category?.name || 'Spendly'}`
+      tn: `Payment from ${category?.name || 'SmartKharch'}`
     })
 
     return `${appScheme}pay?${params.toString()}`
