@@ -1,4 +1,4 @@
-# SmartKharch - Personal Finance App for India
+# Spendly- Personal Finance App for India
 
 A production-ready personal finance management application with real UPI payment integration, built specifically for Indian users.
 
