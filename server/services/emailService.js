@@ -99,9 +99,11 @@ const sendEmail = async (to, templateName, templateData) => {
   try {
     console.log(`📧 Sending ${templateName} email to ${to}`);
     
+    // FAIL LOUDLY if API key is missing - don't silently skip
     if (!process.env.RESEND_API_KEY) {
-      console.log('⚠️ RESEND_API_KEY not set, skipping email in development mode');
-      return { success: true, message: 'Email skipped (development mode)' };
+      console.error('❌ CRITICAL: RESEND_API_KEY is NOT set in environment variables!');
+      console.error('❌ Email will NOT be sent. Add RESEND_API_KEY to Render environment.');
+      throw new Error('RESEND_API_KEY not configured. Emails cannot be sent.');
     }
 
     const template = emailTemplates[templateName];
