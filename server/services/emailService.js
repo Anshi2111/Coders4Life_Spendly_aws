@@ -111,6 +111,7 @@ const sendEmail = async (to, templateName, templateData) => {
 
     const emailContent = template(...templateData);
 
+    console.log('📧 Calling Resend API...');
     const response = await resend.emails.send({
       from: 'SmartKharch <onboarding@resend.dev>',
       to: to,
@@ -118,11 +119,23 @@ const sendEmail = async (to, templateName, templateData) => {
       html: emailContent.html
     });
 
+    console.log(`✅ Resend API response:`, JSON.stringify(response, null, 2));
+
+    if (response.error) {
+      console.error(`❌ Resend API error:`, response.error);
+      return { success: false, error: response.error };
+    }
+
     console.log(`✅ Email sent successfully to ${to}:`, response);
     return { success: true, messageId: response.id };
 
   } catch (error) {
     console.error(`❌ Failed to send ${templateName} email:`, error);
+    console.error(`❌ Error details:`, {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    });
     return { success: false, error: error.message };
   }
 };
