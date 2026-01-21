@@ -112,7 +112,7 @@ const sendEmail = async (to, templateName, templateData) => {
     const emailContent = template(...templateData);
 
     const response = await resend.emails.send({
-      from: 'SmartKharch <yadavanshika148@gmail.com>',
+      from: 'SmartKharch <onboarding@resend.dev>',
       to: to,
       subject: emailContent.subject,
       html: emailContent.html
