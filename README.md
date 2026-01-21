@@ -304,9 +304,9 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions includ
 - Troubleshooting guide
 
 ### Production URLs
-- **Frontend**: `https://smartkharch-frontend.onrender.com`
-- **Backend API**: `https://smartkharch-api.onrender.com`
-- **Health Check**: `https://smartkharch-api.onrender.com/health`
+- **Frontend**: https://coders4life-spendly-aws-3kpk.onrender.com
+- **Backend API**: https://spendly-api-n9wc.onrender.com
+- **Health Check**: https://spendly-api-n9wc.onrender.com/health
 
 ## 📄 License
 
