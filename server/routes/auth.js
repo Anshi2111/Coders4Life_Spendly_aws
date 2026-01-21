@@ -283,9 +283,13 @@ router.post('/send-otp', async (req, res) => {
       });
     }
 
+    // Normalize email: trim and lowercase
+    const normalizedEmail = email.trim().toLowerCase();
+    console.log('📧 Normalized email:', normalizedEmail);
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({ 
         success: false,
         error: 'Invalid email format'
@@ -293,31 +297,34 @@ router.post('/send-otp', async (req, res) => {
     }
 
     // Check if user exists with this email
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
+      console.log('❌ User not found for email:', normalizedEmail);
       return res.status(404).json({ 
         success: false,
         error: 'Email not registered'
       });
     }
 
+    console.log('✅ User found:', user.name);
+
     // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log('📧 Generated OTP for email', email, ':', otp);
+    console.log('📧 Generated OTP for email', normalizedEmail, ':', otp);
 
-    // Store OTP in session/memory (in production, use Redis)
+    // Store OTP in session/memory using normalized email (in production, use Redis)
     if (!global.otpStore) {
       global.otpStore = {};
     }
-    global.otpStore[email] = {
+    global.otpStore[normalizedEmail] = {
       otp: otp,
       timestamp: Date.now(),
       attempts: 0
     };
 
     // Send OTP via Resend email (non-blocking)
-    console.log('📧 Sending OTP email via Resend to:', email);
-    sendOtpEmail(email, otp, user.name).catch(err => {
+    console.log('📧 Sending OTP email via Resend to:', normalizedEmail);
+    sendOtpEmail(normalizedEmail, otp, user.name).catch(err => {
       console.error('❌ Failed to send OTP email via Resend:', err);
     });
     
@@ -349,19 +356,25 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
+    // Normalize email: trim and lowercase
+    const normalizedEmail = email.trim().toLowerCase();
+    console.log('📧 Normalized email for verification:', normalizedEmail);
+
     // Check OTP
-    if (!global.otpStore || !global.otpStore[email]) {
+    if (!global.otpStore || !global.otpStore[normalizedEmail]) {
+      console.log('❌ OTP not found for email:', normalizedEmail);
+      console.log('📧 Available OTP keys:', Object.keys(global.otpStore || {}));
       return res.status(400).json({ 
         success: false,
         error: 'OTP not found or expired'
       });
     }
 
-    const otpData = global.otpStore[email];
+    const otpData = global.otpStore[normalizedEmail];
     
     // Check if OTP expired (10 minutes)
     if (Date.now() - otpData.timestamp > 10 * 60 * 1000) {
-      delete global.otpStore[email];
+      delete global.otpStore[normalizedEmail];
       return res.status(400).json({ 
         success: false,
         error: 'OTP expired'
@@ -370,7 +383,7 @@ router.post('/verify-otp', async (req, res) => {
 
     // Check attempts
     if (otpData.attempts >= 3) {
-      delete global.otpStore[email];
+      delete global.otpStore[normalizedEmail];
       return res.status(400).json({ 
         success: false,
         error: 'Too many attempts. Request a new OTP'
@@ -388,7 +401,7 @@ router.post('/verify-otp', async (req, res) => {
 
     // OTP verified - mark as verified
     otpData.verified = true;
-    console.log('✅ OTP verified for email:', email);
+    console.log('✅ OTP verified for email:', normalizedEmail);
 
     res.json({
       success: true,
@@ -418,8 +431,13 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
+    // Normalize email: trim and lowercase
+    const normalizedEmail = email.trim().toLowerCase();
+    console.log('📧 Normalized email for password reset:', normalizedEmail);
+
     // Check if OTP was verified
-    if (!global.otpStore || !global.otpStore[email] || !global.otpStore[email].verified) {
+    if (!global.otpStore || !global.otpStore[normalizedEmail] || !global.otpStore[normalizedEmail].verified) {
+      console.log('❌ OTP not verified for email:', normalizedEmail);
       return res.status(400).json({ 
         success: false,
         error: 'OTP verification required'
@@ -427,8 +445,9 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Find user
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
+      console.log('❌ User not found for email:', normalizedEmail);
       return res.status(404).json({ 
         success: false,
         error: 'User not found'
@@ -443,9 +462,9 @@ router.post('/reset-password', async (req, res) => {
     await user.save();
 
     // Clear OTP
-    delete global.otpStore[email];
+    delete global.otpStore[normalizedEmail];
 
-    console.log('✅ Password reset for email:', email);
+    console.log('✅ Password reset for email:', normalizedEmail);
 
     res.json({
       success: true,
