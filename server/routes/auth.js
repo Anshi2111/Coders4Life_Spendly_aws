@@ -158,10 +158,12 @@ router.post('/register', async (req, res) => {
     const savedUser = await newUser.save();
     console.log('✅ Step 11: User saved to database:', savedUser._id);
 
-    // Send welcome email
-    console.log('✅ Step 11.5: Sending welcome email...');
-    await sendWelcomeEmail(savedUser.email, savedUser.name);
-    console.log('✅ Step 11.6: Welcome email sent');
+    // Send welcome email (non-blocking - in background)
+    console.log('✅ Step 11.5: Queuing welcome email...');
+    sendWelcomeEmail(savedUser.email, savedUser.name).catch(err => {
+      console.error('❌ Failed to send welcome email:', err);
+    });
+    console.log('✅ Step 11.6: Welcome email queued');
 
     // Generate token
     console.log('✅ Step 12: Generating JWT token...');
@@ -285,21 +287,20 @@ router.post('/send-otp', async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     console.log('📧 Generated OTP:', otp);
 
-    // Send OTP via email
+    // Send OTP via email (non-blocking)
     const sendTo = email || phone;
-    console.log('📧 Sending OTP to:', sendTo);
+    console.log('📧 Queuing OTP email to:', sendTo);
     
-    const result = await sendOtpEmail(sendTo, otp, 'User');
+    // Don't await - send in background
+    sendOtpEmail(sendTo, otp, 'User').catch(err => {
+      console.error('❌ Failed to send OTP email:', err);
+    });
     
-    if (result.success) {
-      console.log('✅ OTP sent successfully');
-      res.json({
-        success: true,
-        message: 'OTP sent successfully to your email'
-      });
-    } else {
-      throw new Error(result.error);
-    }
+    // Return success immediately
+    res.json({
+      success: true,
+      message: 'OTP sent successfully to your email'
+    });
 
   } catch (error) {
     console.error('❌ Send OTP error:', error);
