@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { sendWelcomeEmail, sendOtpEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -157,6 +158,11 @@ router.post('/register', async (req, res) => {
     const savedUser = await newUser.save();
     console.log('✅ Step 11: User saved to database:', savedUser._id);
 
+    // Send welcome email
+    console.log('✅ Step 11.5: Sending welcome email...');
+    await sendWelcomeEmail(savedUser.email, savedUser.name);
+    console.log('✅ Step 11.6: Welcome email sent');
+
     // Generate token
     console.log('✅ Step 12: Generating JWT token...');
     const token = jwt.sign(
@@ -266,22 +272,34 @@ router.post('/login', async (req, res) => {
 router.post('/send-otp', async (req, res) => {
   console.log('📥 Send OTP endpoint hit');
   try {
-    const { phone } = req.body;
+    const { email, phone } = req.body;
     
-    if (!phone) {
+    if (!email && !phone) {
       return res.status(400).json({ 
         success: false,
-        error: 'Phone number required'
+        error: 'Email or phone number required'
       });
     }
 
-    // For now, just return success (implement SMS later)
-    console.log('📱 OTP would be sent to:', phone);
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log('📧 Generated OTP:', otp);
+
+    // Send OTP via email
+    const sendTo = email || phone;
+    console.log('📧 Sending OTP to:', sendTo);
     
-    res.json({
-      success: true,
-      message: 'OTP sent successfully (development mode)'
-    });
+    const result = await sendOtpEmail(sendTo, otp, 'User');
+    
+    if (result.success) {
+      console.log('✅ OTP sent successfully');
+      res.json({
+        success: true,
+        message: 'OTP sent successfully to your email'
+      });
+    } else {
+      throw new Error(result.error);
+    }
 
   } catch (error) {
     console.error('❌ Send OTP error:', error);

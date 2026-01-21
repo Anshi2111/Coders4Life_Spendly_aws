@@ -21,6 +21,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.1.4",
+    "resend": "^6.8.0",
     "sqlite3": "^5.1.6"
   },
   "devDependencies": {
