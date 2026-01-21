@@ -270,33 +270,57 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Simple OTP routes (minimal for now)
+// Send OTP via email (Resend.com)
 router.post('/send-otp', async (req, res) => {
   console.log('📥 Send OTP endpoint hit');
   try {
-    const { email, phone } = req.body;
+    const { email } = req.body;
     
-    if (!email && !phone) {
+    if (!email) {
       return res.status(400).json({ 
         success: false,
-        error: 'Email or phone number required'
+        error: 'Email required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid email format'
+      });
+    }
+
+    // Check if user exists with this email
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Email not registered'
       });
     }
 
     // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log('📧 Generated OTP:', otp);
+    console.log('📧 Generated OTP for email', email, ':', otp);
 
-    // Send OTP via email (non-blocking)
-    const sendTo = email || phone;
-    console.log('📧 Queuing OTP email to:', sendTo);
-    
-    // Don't await - send in background
-    sendOtpEmail(sendTo, otp, 'User').catch(err => {
-      console.error('❌ Failed to send OTP email:', err);
+    // Store OTP in session/memory (in production, use Redis)
+    if (!global.otpStore) {
+      global.otpStore = {};
+    }
+    global.otpStore[email] = {
+      otp: otp,
+      timestamp: Date.now(),
+      attempts: 0
+    };
+
+    // Send OTP via Resend email (non-blocking)
+    console.log('📧 Sending OTP email via Resend to:', email);
+    sendOtpEmail(email, otp, user.name).catch(err => {
+      console.error('❌ Failed to send OTP email via Resend:', err);
     });
     
-    // Return success immediately
     res.json({
       success: true,
       message: 'OTP sent successfully to your email'
@@ -312,20 +336,130 @@ router.post('/send-otp', async (req, res) => {
   }
 });
 
-router.post('/verify-otp', (req, res) => {
+// Verify OTP
+router.post('/verify-otp', async (req, res) => {
   console.log('📥 Verify OTP endpoint hit');
-  res.json({
-    success: true,
-    message: 'OTP verified (development mode)'
-  });
+  try {
+    const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Email and OTP required'
+      });
+    }
+
+    // Check OTP
+    if (!global.otpStore || !global.otpStore[email]) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'OTP not found or expired'
+      });
+    }
+
+    const otpData = global.otpStore[email];
+    
+    // Check if OTP expired (10 minutes)
+    if (Date.now() - otpData.timestamp > 10 * 60 * 1000) {
+      delete global.otpStore[email];
+      return res.status(400).json({ 
+        success: false,
+        error: 'OTP expired'
+      });
+    }
+
+    // Check attempts
+    if (otpData.attempts >= 3) {
+      delete global.otpStore[email];
+      return res.status(400).json({ 
+        success: false,
+        error: 'Too many attempts. Request a new OTP'
+      });
+    }
+
+    // Verify OTP
+    if (otpData.otp !== otp) {
+      otpData.attempts++;
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid OTP'
+      });
+    }
+
+    // OTP verified - mark as verified
+    otpData.verified = true;
+    console.log('✅ OTP verified for email:', email);
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Verify OTP error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to verify OTP',
+      message: error.message
+    });
+  }
 });
 
-router.post('/reset-password', (req, res) => {
+// Reset password
+router.post('/reset-password', async (req, res) => {
   console.log('📥 Reset password endpoint hit');
-  res.json({
-    success: true,
-    message: 'Password reset (development mode)'
-  });
+  try {
+    const { email, newPassword } = req.body;
+    
+    if (!email || !newPassword) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Email and new password required'
+      });
+    }
+
+    // Check if OTP was verified
+    if (!global.otpStore || !global.otpStore[email] || !global.otpStore[email].verified) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'OTP verification required'
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    // Clear OTP
+    delete global.otpStore[email];
+
+    console.log('✅ Password reset for email:', email);
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Reset password error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to reset password',
+      message: error.message
+    });
+  }
 });
 
 module.exports = router;

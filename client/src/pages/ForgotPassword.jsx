@@ -6,8 +6,8 @@ import api from '../services/api'
 
 function ForgotPassword() {
   const navigate = useNavigate()
-  const [step, setStep] = useState(1) // 1: Phone, 2: OTP, 3: Reset Password
-  const [phone, setPhone] = useState('')
+  const [step, setStep] = useState(1) // 1: Email, 2: OTP, 3: Reset Password
+  const [email, setEmail] = useState('')
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -28,10 +28,10 @@ function ForgotPassword() {
     }
   }, [resendCooldown])
 
-  // Phone validation
-  const validatePhone = (phoneNumber) => {
-    const phoneRegex = /^[6-9]\d{9}$/
-    return phoneRegex.test(phoneNumber)
+  // Email validation
+  const validateEmail = (emailAddress) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(emailAddress)
   }
 
   // Password strength validation
@@ -46,8 +46,8 @@ function ForgotPassword() {
   const handleSendOTP = async (e) => {
     e.preventDefault()
     
-    if (!validatePhone(phone)) {
-      setError('Please enter a valid 10-digit phone number')
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address')
       return
     }
 
@@ -55,7 +55,7 @@ function ForgotPassword() {
     setError('')
 
     try {
-      const response = await api.post('/auth/send-otp', { phone })
+      const response = await api.post('/auth/send-otp', { email })
       
       if (response.data.success) {
         setStep(2)
@@ -66,9 +66,9 @@ function ForgotPassword() {
     } catch (err) {
       console.error('Send OTP error:', err)
       if (err.response?.status === 404) {
-        setError('Phone number not registered. Please register first or use a different number.')
+        setError('Email not registered. Please register first or use a different email.')
       } else if (err.response?.status === 400) {
-        setError(err.response.data?.error || 'Invalid phone number format')
+        setError(err.response.data?.error || 'Invalid email format')
       } else if (err.response?.status === 500) {
         setError('Server error. Please try again later.')
       } else {
@@ -94,7 +94,7 @@ function ForgotPassword() {
 
     try {
       const response = await api.post('/auth/verify-otp', { 
-        phone, 
+        email, 
         otp: otpString 
       })
       
@@ -142,13 +142,13 @@ function ForgotPassword() {
 
     try {
       const response = await api.post('/auth/reset-password', { 
-        phone, 
+        email, 
         newPassword 
       })
       
       if (response.data.success) {
         // Clear sensitive state
-        setPhone('')
+        setEmail('')
         setNewPassword('')
         setConfirmPassword('')
         setOtpVerified(false)
@@ -177,7 +177,7 @@ function ForgotPassword() {
     setOtp(['', '', '', '', '', ''])
 
     try {
-      const response = await api.post('/auth/send-otp', { phone })
+      const response = await api.post('/auth/send-otp', { email })
       
       if (response.data.success) {
         setResendCooldown(30)
@@ -213,7 +213,7 @@ function ForgotPassword() {
     }
   }
 
-  // Step 1: Phone Number Input
+  // Step 1: Email Input
   if (step === 1) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4 sm:px-6 lg:px-8">
@@ -226,7 +226,7 @@ function ForgotPassword() {
               Forgot Password
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Enter your registered phone number to receive OTP
+              Enter your registered email to receive OTP
             </p>
           </div>
 
@@ -240,38 +240,37 @@ function ForgotPassword() {
               )}
 
               <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Phone Number
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Email Address
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Phone className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
+                    id="email"
+                    name="email"
+                    type="email"
                     required
                     className="input w-full pl-12"
-                    placeholder="9876543210"
-                    value={phone}
+                    placeholder="your@email.com"
+                    value={email}
                     onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '').slice(0, 10)
-                      setPhone(value)
+                      setEmail(e.target.value)
                       setError('')
                     }}
                     disabled={loading}
                   />
                 </div>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Enter 10-digit mobile number without country code
+                  Enter your registered email address
                 </p>
               </div>
 
               <div>
                 <button
                   type="submit"
-                  disabled={loading || !phone}
+                  disabled={loading || !email}
                   className="btn-primary w-full flex items-center justify-center"
                 >
                   {loading ? (
@@ -316,7 +315,7 @@ function ForgotPassword() {
               Verify OTP
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Enter the 6-digit code sent to +91 {phone}
+              Enter the 6-digit code sent to {email}
             </p>
           </div>
 
@@ -393,7 +392,7 @@ function ForgotPassword() {
                   className="flex items-center justify-center space-x-2 text-sm text-gray-600 hover:text-gray-500 dark:text-gray-400 transition-colors mx-auto"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  <span>Change Phone Number</span>
+                  <span>Change Email</span>
                 </button>
               </div>
             </form>
