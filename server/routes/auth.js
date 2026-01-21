@@ -324,6 +324,7 @@ router.post('/send-otp', async (req, res) => {
 
     // Send OTP via Resend email (non-blocking)
     console.log('📧 Sending OTP email via Resend to:', normalizedEmail);
+    console.log("CALLING RESEND FOR:", normalizedEmail);
     sendOtpEmail(normalizedEmail, otp, user.name).catch(err => {
       console.error('❌ Failed to send OTP email via Resend:', err);
     });
